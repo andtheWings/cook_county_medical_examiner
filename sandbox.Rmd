@@ -1,0 +1,29 @@
+---
+title: "Sandbox"
+author: "Daniel P. Hall Riggins, MD"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(targets)
+library(tidyverse)
+```
+
+```{r}
+tar_make()
+tar_load(everything())
+```
+
+```{r}
+
+```
+
+```{r}
+filter(
+    zip_nodes, 
+    str_detect(zip_code, "[:digit:]{5}") &
+        !str_detect(zip_code, "[:digit:]{6,}")
+)$zip_code |>  length()
+```
+
