@@ -7,17 +7,124 @@ output: html_document
 
 ```{r}
 library(targets)
-library(tidyverse)
+library(dplyr)
+library(mapdeck)
+library(sf)
+library(tidygraph)
+library(tidyr)
 ```
+
+
+
 
 ```{r}
 tar_make()
-tar_load(everything())
+tar_load(cook_county_zip_code_boundaries)
 ```
 
 ```{r}
+cook_county_zip_code_boundaries
+```
+
+
+```{r}
+
+cook_homicide_graph_tbl <- as_tibble(cook_homicide_graph)
+
+test <-
+    zip_code_nodes_post_geocode |> 
+        select(zip_code, lon, lat) |> 
+        right_join(archive, by = c("zip_code" = "incident_zip_code")) |> 
+        rename(
+            incident_zip = zip_code,
+            incident_zip_lon = lon,
+            incident_zip_lat = lat
+        ) |> 
+        left_join(zip_code_nodes_post_geocode, by = c("residence_zip" = "zip_code")) |> 
+        select(
+            incident_zip, incident_zip_lon, incident_zip_lat,
+            residence_zip,
+            residence_zip_lon = lon,
+            residence_zip_lat = lat
+        ) |> 
+        group_by(
+            incident_zip, incident_zip_lon, incident_zip_lat,
+            residence_zip, residence_zip_lon, residence_zip_lat
+        ) |> 
+        summarise(
+            weight = n(),
+            .groups = "keep"
+        ) |> 
+        ungroup()
+
+test2 <- 
+    st_as_sf(
+        test,
+        coords = c("incident_zip_lon", "incident_zip_lat"),
+        crs = 4326,
+        remove = FALSE
+    ) |> 
+    rename(incident_zip_geom = geometry) 
+
+test2
+
+test3 <-
+    st_as_sf(
+        test,
+        coords = c("residence_zip_lon", "residence_zip_lat"),
+        crs = 4326
+    )
+
+test2$residence_zip_geom <- test3$geometry
+
+test4 <- 
+    test2 |> 
+    filter(
+        st_intersects(
+            test2$incident_zip_geom, 
+            cook_county_border, 
+            sparse = FALSE
+        )[,1] &
+        st_intersects(
+            test2$residence_zip_geom, 
+            cook_county_border, 
+            sparse = FALSE
+        )[,1]
+    ) |> 
+    as_tibble() |> 
+    select(-incident_zip_geom, -residence_zip_geom) |> 
+    mutate(weight = log(weight)) |> 
+    filter(weight > 2)
+
 
 ```
+```{r}
+mapdeck(
+    data = test4,
+    token = "pk.eyJ1IjoiZGFucmlnZ2lucyIsImEiOiJjbDNzemloZTkxd3pwM2ptOTBkcjFjaXA3In0.uQ8ea1QvwAvKmGLLu1r7UA",
+    style = "mapbox://styles/mapbox/dark-v10",
+    pitch = 45
+) |> 
+    add_arc(
+        origin = c("incident_zip_lon", "incident_zip_lat"),
+        destination = c("residence_zip_lon", "residence_zip_lat"),
+        stroke_from = "weight",
+        stroke_to = "weight",
+        legend = TRUE
+    )
+```
+
+```{r}
+mapdeck(
+    head(test),
+    style = "dark"
+) |> 
+    add_arc(
+        origin = c("incident_zip_lon", "incident_zip_lat"),
+        destination = c("residence_zip_lon", "residence_zip_lat")
+    )
+```
+
 
 ```{r}
 filter(

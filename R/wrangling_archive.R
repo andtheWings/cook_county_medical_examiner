@@ -44,19 +44,33 @@ wrangle_archive <- function(archive_raw_df) {
     
     df1 <-
         archive_raw_df |> 
-        rename(
-            from = `Incident Zip Code`,
-            to = `Residence Zip`
+        janitor::clean_names() |>
+        # Remove entries without zip codes listed
+        filter(
+            !is.na(incident_zip_code)
         ) |> 
         filter(
-            !is.na(from) &
-                str_detect(from, "[:digit:]{5}") &
-                !str_detect(from, "[:digit:]{6,}") &
-                !is.na(to) &
-                str_detect(to, "[:digit:]{5}") &
-                !str_detect(to, "[:digit:]{6,}")
-        )
-    
+            !is.na(residence_zip)
+        ) |>
+        # Validate zip codes as length 5 digits
+        filter(
+            str_detect(incident_zip_code, "[:digit:]{5}")
+        ) |> 
+        filter(
+            !str_detect(incident_zip_code, "[:digit:]{6,}")
+        ) |> 
+        filter(
+            str_detect(residence_zip, "[:digit:]{5}")
+        ) |> 
+        filter(
+            !str_detect(residence_zip, "[:digit:]{6,}")
+        ) |> 
+        # Take out fake zip codes
+        filter(incident_zip_code != "00000") |> 
+        filter(incident_zip_code != "99999") |> 
+        filter(residence_zip != "00000") |> 
+        filter(residence_zip != "99999") 
+        
     return(df1)
     
 }
@@ -65,7 +79,7 @@ wrangle_zip_code_nodes_pre_geocode <- function(archive_df) {
     
     df1 <-
         tibble(
-            zip_code = c(archive_df$from, archive_df$to)
+            zip_code = c(archive_df$incident_zip_code, archive_df$residence_zip)
         ) |> 
         distinct() |> 
         separate(
@@ -78,6 +92,77 @@ wrangle_zip_code_nodes_pre_geocode <- function(archive_df) {
         mutate(
             zip_code_query = paste(zip_code_5, "United States")
         )
+    
+    return(df1)
+    
+}
+
+wrangle_cook_zip_code_nodes <- function(zip_code_nodes_post_geocode_df) {
+    
+    cook_county_border <- st_read("data/Cook_County_Border.geojson")
+    
+    all_zips_sf <-
+        zip_code_nodes_post_geocode_df |> 
+        st_as_sf(coords = c("lon", "lat")) |> 
+        st_set_crs(4326) 
+    
+    cook_zips <-
+        all_zips_sf |> 
+        filter(
+            st_intersects(
+                all_zips_sf, cook_county_border,
+                sparse = FALSE
+            )[,1]
+        )
+    
+    return(cook_zips)
+    
+}
+
+wrangle_cook_homicide_edges <- function(archive_df, cook_zip_code_nodes_df) {
+    
+    df1 <-
+        archive_df |> 
+        filter(manner_of_death == "HOMICIDE") |> 
+        separate(
+            incident_zip_code,
+            into = "from",
+            sep = "-",
+            remove = FALSE,
+            extra = "drop"
+        ) |> 
+        separate(
+            residence_zip,
+            into = "to",
+            sep = "-",
+            remove = FALSE,
+            extra = "drop"
+        ) |> 
+        relocate(from, to) |> 
+        filter(
+            from %in% cook_zip_code_nodes_df$zip_code_5 | to %in% cook_zip_code_nodes_df$zip_code_5
+        )
+        
+    return(df1)
+    
+}
+
+wrangle_cook_homicide_graph <- function(wrangle_cook_homicide_edges_df) {
+    
+    df1 <-
+        wrangle_cook_homicide_edges_df |> 
+        as_tbl_graph(directed = TRUE) |> 
+        activate(nodes) |> 
+        mutate(
+            degree = centrality_degree(),
+            betweenness = centrality_betweenness()
+        ) |> 
+        morph(to_undirected) |> 
+        mutate(
+            closeness = centrality_closeness_harmonic(),
+            neighborhood = group_louvain()
+        ) |> 
+        unmorph()
     
     return(df1)
     

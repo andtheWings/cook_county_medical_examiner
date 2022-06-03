@@ -2,3 +2,7 @@
 .Rproj.user/
 
 _targets/
+
+.Rproj.user.backup/
+
+data/
