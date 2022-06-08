@@ -2,6 +2,7 @@ library(targets)
 
 source("R/wrangling_archive.R")
 source("R/wrangling_esri.R")
+source("R/describing_ccme.R")
 
 tar_option_set(
     packages = c(
@@ -12,6 +13,33 @@ tar_option_set(
 )
 
 list(
+    # Medical Examiner Archive
+    tar_target(
+        ccme_archive_raw_file,
+        "data/Medical_Examiner_Case_Archive.csv",
+        format = "file"
+    ),
+    tar_target(
+        ccme_archive_raw,
+        read_ccme_archive_raw(ccme_archive_raw_file)
+    ),
+    tar_target(
+        ccme_homicide_edges,
+        wrangle_ccme_homicide_edges(ccme_archive_raw)
+    ),
+    tar_target(
+        ccme_homicide_table_1,
+        make_ccme_homicide_table_1(ccme_homicide_edges),
+        format = "file"
+    ),
+    tar_target(
+        ccme_homicide_graph,
+        wrangle_ccme_homicide_graph(ccme_homicide_edges)
+    ),
+    tar_target(
+        ccme_homicide_nodes,
+        ccme_homicide_graph |> activate(nodes) |> as_tibble()
+    ),
     # Cook County Boundary
     tar_target(
         cook_county_boundary_file,
@@ -34,41 +62,13 @@ list(
         cook_county_zip_code_boundaries,
         wrangle_cook_county_zip_code_boundaries(esri_zip_code_boundaries_file, cook_county_boundary)
     ),
-    # Medical Examiner Archive
+    # Combining
     tar_target(
-        archive_raw_file,
-        "data/Medical_Examiner_Case_Archive.csv",
-        format = "file"
+        cook_county_homicide_vis_edges,
+        wrangle_cook_county_homicide_vis_edges(cook_county_zip_code_boundaries, ccme_homicide_edges, ccme_homicide_nodes)
     ),
     tar_target(
-        archive_raw,
-        read_archive_raw_csv(archive_raw_file)
-    ),
-    tar_target(
-        archive,
-        wrangle_archive(archive_raw)
-    ),
-    tar_target(
-        zip_code_nodes_pre_geocode,
-        wrangle_zip_code_nodes_pre_geocode(archive)
-    ),
-    tar_target(
-        zip_code_nodes_post_geocode,
-        mutate_geocode(
-            zip_code_nodes_pre_geocode,
-            zip_code_query
-        )
-    ),
-    tar_target(
-        cook_zip_code_nodes,
-        wrangle_cook_zip_code_nodes(zip_code_nodes_post_geocode)
-    ),
-    tar_target(
-        cook_homicide_edges,
-        wrangle_cook_homicide_edges(archive, cook_zip_code_nodes)
-    ),
-    tar_target(
-        cook_homicide_graph,
-        wrangle_cook_homicide_graph(cook_homicide_edges)
+        cook_county_homicide_vis_nodes,
+        inner_join(cook_county_zip_code_boundaries, ccme_homicide_nodes, by = c("ZIP_CODE" = "name"))
     )
 )

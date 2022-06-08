@@ -1,4 +1,4 @@
-read_archive_raw_csv <- function(archive_raw_csv) {
+read_ccme_archive_raw <- function(archive_raw_csv) {
     
     parse_spec <-
         cols(
@@ -40,7 +40,7 @@ read_archive_raw_csv <- function(archive_raw_csv) {
     
 }
 
-wrangle_archive <- function(archive_raw_df) {
+wrangle_ccme_homicide_edges <- function(archive_raw_df) {
     
     df1 <-
         archive_raw_df |> 
@@ -69,60 +69,7 @@ wrangle_archive <- function(archive_raw_df) {
         filter(incident_zip_code != "00000") |> 
         filter(incident_zip_code != "99999") |> 
         filter(residence_zip != "00000") |> 
-        filter(residence_zip != "99999") 
-        
-    return(df1)
-    
-}
-
-wrangle_zip_code_nodes_pre_geocode <- function(archive_df) {
-    
-    df1 <-
-        tibble(
-            zip_code = c(archive_df$incident_zip_code, archive_df$residence_zip)
-        ) |> 
-        distinct() |> 
-        separate(
-            zip_code,
-            into = "zip_code_5",
-            sep = "-",
-            remove = FALSE,
-            extra = "drop"
-        ) |> 
-        mutate(
-            zip_code_query = paste(zip_code_5, "United States")
-        )
-    
-    return(df1)
-    
-}
-
-wrangle_cook_zip_code_nodes <- function(zip_code_nodes_post_geocode_df) {
-    
-    cook_county_border <- st_read("data/Cook_County_Border.geojson")
-    
-    all_zips_sf <-
-        zip_code_nodes_post_geocode_df |> 
-        st_as_sf(coords = c("lon", "lat")) |> 
-        st_set_crs(4326) 
-    
-    cook_zips <-
-        all_zips_sf |> 
-        filter(
-            st_intersects(
-                all_zips_sf, cook_county_border,
-                sparse = FALSE
-            )[,1]
-        )
-    
-    return(cook_zips)
-    
-}
-
-wrangle_cook_homicide_edges <- function(archive_df, cook_zip_code_nodes_df) {
-    
-    df1 <-
-        archive_df |> 
+        filter(residence_zip != "99999") |> 
         filter(manner_of_death == "HOMICIDE") |> 
         separate(
             incident_zip_code,
@@ -137,20 +84,16 @@ wrangle_cook_homicide_edges <- function(archive_df, cook_zip_code_nodes_df) {
             sep = "-",
             remove = FALSE,
             extra = "drop"
-        ) |> 
-        relocate(from, to) |> 
-        filter(
-            from %in% cook_zip_code_nodes_df$zip_code_5 | to %in% cook_zip_code_nodes_df$zip_code_5
         )
         
     return(df1)
     
 }
 
-wrangle_cook_homicide_graph <- function(wrangle_cook_homicide_edges_df) {
+wrangle_ccme_homicide_graph <- function(ccme_homicide_edges_df) {
     
     df1 <-
-        wrangle_cook_homicide_edges_df |> 
+        ccme_homicide_edges_df |> 
         as_tbl_graph(directed = TRUE) |> 
         activate(nodes) |> 
         mutate(
@@ -165,5 +108,144 @@ wrangle_cook_homicide_graph <- function(wrangle_cook_homicide_edges_df) {
         unmorph()
     
     return(df1)
+        
+}
+
+wrangle_cook_county_homicide_vis_edges <- function(cook_county_zip_code_boundaries_sf, ccme_homicide_edges_df, ccme_homicide_nodes_df) {
+    
+    zip_cent_coords <-
+        cook_county_zip_code_boundaries_sf |> 
+        select(ZIP_CODE) |> 
+        mutate(centroid = st_centroid(Shape)) |> 
+        st_drop_geometry() |> 
+        st_as_sf()
+    
+    zip_cent_coords <-
+        bind_cols(zip_cent_coords, st_coordinates(zip_cent_coords)) |> 
+        st_drop_geometry()
+    
+    vis_edges <-
+        ccme_homicide_edges_df |> 
+        group_by(from, to) |> 
+        summarize(weight = n()) |> 
+        inner_join(zip_cent_coords, by = c("from" = "ZIP_CODE")) |> 
+        rename(
+            from_lon = X,
+            from_lat = Y
+        ) |> 
+        inner_join(zip_cent_coords, by = c("to" = "ZIP_CODE")) |>
+        rename(
+            to_lon = X,
+            to_lat = Y
+        ) |>
+        inner_join(ccme_homicide_nodes_df, by = c("from" = "name")) |>
+        rename(
+            from_degree = degree,
+            from_betweenness = betweenness,
+            from_closeness = closeness,
+            from_neighborhood = neighborhood
+        ) |>
+        inner_join(ccme_homicide_nodes_df, by = c("to" = "name")) |>
+        rename(
+            to_degree = degree,
+            to_betweenness = betweenness,
+            to_closeness = closeness,
+            to_neighborhood = neighborhood
+        )
+    
+    return(vis_edges)
     
 }
+
+# wrangle_zip_code_nodes_pre_geocode <- function(archive_df) {
+#     
+#     df1 <-
+#         tibble(
+#             zip_code = c(archive_df$incident_zip_code, archive_df$residence_zip)
+#         ) |> 
+#         distinct() |> 
+#         separate(
+#             zip_code,
+#             into = "zip_code_5",
+#             sep = "-",
+#             remove = FALSE,
+#             extra = "drop"
+#         ) |> 
+#         mutate(
+#             zip_code_query = paste(zip_code_5, "United States")
+#         )
+#     
+#     return(df1)
+#     
+# }
+# 
+# wrangle_cook_zip_code_nodes <- function(zip_code_nodes_post_geocode_df) {
+#     
+#     cook_county_border <- st_read("data/Cook_County_Border.geojson")
+#     
+#     all_zips_sf <-
+#         zip_code_nodes_post_geocode_df |> 
+#         st_as_sf(coords = c("lon", "lat")) |> 
+#         st_set_crs(4326) 
+#     
+#     cook_zips <-
+#         all_zips_sf |> 
+#         filter(
+#             st_intersects(
+#                 all_zips_sf, cook_county_border,
+#                 sparse = FALSE
+#             )[,1]
+#         )
+#     
+#     return(cook_zips)
+#     
+# }
+# 
+# wrangle_cook_homicide_edges <- function(archive_df, cook_zip_code_nodes_df) {
+#     
+#     df1 <-
+#         archive_df |> 
+#         filter(manner_of_death == "HOMICIDE") |> 
+#         separate(
+#             incident_zip_code,
+#             into = "from",
+#             sep = "-",
+#             remove = FALSE,
+#             extra = "drop"
+#         ) |> 
+#         separate(
+#             residence_zip,
+#             into = "to",
+#             sep = "-",
+#             remove = FALSE,
+#             extra = "drop"
+#         ) |> 
+#         relocate(from, to) |> 
+#         filter(
+#             from %in% cook_zip_code_nodes_df$zip_code_5 | to %in% cook_zip_code_nodes_df$zip_code_5
+#         )
+#         
+#     return(df1)
+#     
+# }
+# 
+# wrangle_cook_homicide_graph <- function(wrangle_cook_homicide_edges_df) {
+#     
+#     df1 <-
+#         wrangle_cook_homicide_edges_df |> 
+#         as_tbl_graph(directed = TRUE) |> 
+#         activate(nodes) |> 
+#         mutate(
+#             degree = centrality_degree(),
+#             betweenness = centrality_betweenness()
+#         ) |> 
+#         morph(to_undirected) |> 
+#         mutate(
+#             closeness = centrality_closeness_harmonic(),
+#             neighborhood = group_louvain()
+#         ) |> 
+#         unmorph()
+#     
+#     return(df1)
+#     
+# }
