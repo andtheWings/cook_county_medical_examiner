@@ -1,13 +1,15 @@
 library(targets)
-
-source("R/wrangling_archive.R")
-source("R/wrangling_esri.R")
 source("R/describing_ccme.R")
+source("R/visualizing_ccme.R")
+source("R/wrangling_archive.R")
+source("R/wrangling_ccme_esri.R")
+source("R/wrangling_esri.R")
+
 
 tar_option_set(
     packages = c(
         "dplyr", "readr", "stringr", "tidyr",
-        "ggmap", "sf",
+        "ggmap", "sf", "mapdeck",
         "tidygraph"
     )
 )
@@ -59,10 +61,18 @@ list(
         format = "file"
     ),
     tar_target(
+        ccme_homicide_zip_code_boundaries,
+        wrangle_ccme_homicide_zip_code_boundaries(ccme_homicide_nodes, esri_zip_code_boundaries_file)
+    ),
+    tar_target(
         cook_county_zip_code_boundaries,
         wrangle_cook_county_zip_code_boundaries(esri_zip_code_boundaries_file, cook_county_boundary)
     ),
     # Combining
+    tar_target(
+        ccme_homicide_vis_edges,
+        wrangle_ccme_homicide_vis_edges(ccme_homicide_zip_code_boundaries, ccme_homicide_edges, ccme_homicide_nodes)
+    ),
     tar_target(
         cook_county_homicide_vis_edges,
         wrangle_cook_county_homicide_vis_edges(cook_county_zip_code_boundaries, ccme_homicide_edges, ccme_homicide_nodes)
@@ -70,5 +80,33 @@ list(
     tar_target(
         cook_county_homicide_vis_nodes,
         inner_join(cook_county_zip_code_boundaries, ccme_homicide_nodes, by = c("ZIP_CODE" = "name"))
+    ),
+    tar_target(
+        ccme_homicide_vis_nodes,
+        inner_join(ccme_homicide_zip_code_boundaries, ccme_homicide_nodes, by = c("ZIP_CODE" = "name"))
+    ),
+    tar_target(
+        cook_county_homicide_degree_map,
+        map_ccme_centrality("degree", cook_county_homicide_vis_nodes, cook_county_homicide_vis_edges)
+    ),
+    tar_target(
+        ccme_homicide_homicide_degree_map,
+        map_ccme_centrality("homicide_degree", ccme_homicide_vis_nodes, ccme_homicide_vis_edges)
+    ),
+    tar_target(
+        cook_county_homicide_closeness_map,
+        map_ccme_centrality("closeness", cook_county_homicide_vis_nodes, cook_county_homicide_vis_edges)
+    ),
+    tar_target(
+        cook_county_homicide_betweenness_map,
+        map_ccme_centrality("betweenness", cook_county_homicide_vis_nodes, cook_county_homicide_vis_edges)
+    ),
+    tar_target(
+        cook_county_homicide_neighborhood_map,
+        map_ccme_neighborhoods(cook_county_homicide_vis_nodes)
+    ),
+    tarchetypes::tar_render(
+        maps_report,
+        "outputs/ccme_homicide_maps.Rmd"
     )
 )

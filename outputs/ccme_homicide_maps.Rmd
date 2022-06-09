@@ -1,0 +1,33 @@
+---
+title: "Cook County Medical Examiner Homicide Maps"
+author: "Daniel P. Hall Riggins, MD"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Degree
+
+```{r echo=FALSE}
+library(targets)
+library(mapdeck)
+
+tar_read(cook_county_homicide_degree_map)
+```
+
+## Closeness
+
+```{r echo=FALSE}
+tar_read(cook_county_homicide_closeness_map)
+```
+
+## Betweenness
+
+```{r echo=FALSE}
+tar_read(cook_county_homicide_betweenness_map)
+```
+
+## Neighborhoods
+
+```{r echo=FALSE}
+tar_read(cook_county_homicide_neighborhood_map)
+```

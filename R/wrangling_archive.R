@@ -97,7 +97,11 @@ wrangle_ccme_homicide_graph <- function(ccme_homicide_edges_df) {
         as_tbl_graph(directed = TRUE) |> 
         activate(nodes) |> 
         mutate(
-            degree = centrality_degree(),
+            homicide_degree = centrality_degree(mode = "out"),
+            residence_degree = centrality_degree(mode = "in"),
+            std_residence_homicide_diff = (residence_degree - homicide_degree)/(residence_degree + homicide_degree),
+            homicide_degree_perc_rank = percent_rank(homicide_degree),
+            residence_degree_perc_rank = percent_rank(residence_degree),
             betweenness = centrality_betweenness()
         ) |> 
         morph(to_undirected) |> 
@@ -140,14 +144,68 @@ wrangle_cook_county_homicide_vis_edges <- function(cook_county_zip_code_boundari
         ) |>
         inner_join(ccme_homicide_nodes_df, by = c("from" = "name")) |>
         rename(
-            from_degree = degree,
+            from_residence_degree = residence_degree,
+            from_homicide_degree = homicide_degree,
+            from_residence_homicide_diff = std_residence_homicide_diff,
             from_betweenness = betweenness,
             from_closeness = closeness,
             from_neighborhood = neighborhood
         ) |>
         inner_join(ccme_homicide_nodes_df, by = c("to" = "name")) |>
         rename(
-            to_degree = degree,
+            to_residence_degree = residence_degree,
+            to_homicide_degree = homicide_degree,
+            to_residence_homicide_diff = std_residence_homicide_diff,
+            to_betweenness = betweenness,
+            to_closeness = closeness,
+            to_neighborhood = neighborhood
+        )
+    
+    return(vis_edges)
+    
+}
+
+wrangle_ccme_homicide_vis_edges <- function(ccme_homicide_zip_code_boundaries_sf, ccme_homicide_edges_df, ccme_homicide_nodes_df) {
+    
+    zip_cent_coords <-
+        ccme_homicide_zip_code_boundaries_sf |> 
+        select(ZIP_CODE) |> 
+        mutate(centroid = st_centroid(Shape)) |> 
+        st_drop_geometry() |> 
+        st_as_sf()
+    
+    zip_cent_coords <-
+        bind_cols(zip_cent_coords, st_coordinates(zip_cent_coords)) |> 
+        st_drop_geometry()
+    
+    vis_edges <-
+        ccme_homicide_edges_df |> 
+        group_by(from, to) |> 
+        summarize(weight = n()) |> 
+        inner_join(zip_cent_coords, by = c("from" = "ZIP_CODE")) |> 
+        rename(
+            from_lon = X,
+            from_lat = Y
+        ) |> 
+        inner_join(zip_cent_coords, by = c("to" = "ZIP_CODE")) |>
+        rename(
+            to_lon = X,
+            to_lat = Y
+        ) |>
+        inner_join(ccme_homicide_nodes_df, by = c("from" = "name")) |>
+        rename(
+            from_residence_degree = residence_degree,
+            from_homicide_degree = homicide_degree,
+            from_residence_homicide_diff = std_residence_homicide_diff,
+            from_betweenness = betweenness,
+            from_closeness = closeness,
+            from_neighborhood = neighborhood
+        ) |>
+        inner_join(ccme_homicide_nodes_df, by = c("to" = "name")) |>
+        rename(
+            to_residence_degree = residence_degree,
+            to_homicide_degree = homicide_degree,
+            to_residence_homicide_diff = std_residence_homicide_diff,
             to_betweenness = betweenness,
             to_closeness = closeness,
             to_neighborhood = neighborhood

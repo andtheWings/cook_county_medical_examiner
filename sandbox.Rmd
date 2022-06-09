@@ -20,32 +20,21 @@ tar_load(cook_county_homicide_vis_edges)
 ```
 
 ```{r}
-neighborhoods <- 
-    filter(cook_county_homicide_vis_nodes, neighborhood %in% c(1:4,6)) |> 
-    mutate(
-        neighborhood_hex =
-            case_when(
-                neighborhood == 1 ~ "#85D4E399",
-                neighborhood == 2 ~ "#F4B5BD99",
-                neighborhood == 3 ~ "#9C964A99",
-                neighborhood == 4 ~ "#CDC08C99",
-                neighborhood == 6 ~ "#FAD77B99",
-            )
-    )
+neighborhoods <- filter(cook_county_homicide_vis_nodes, neighborhood %in% c(1:4,6))
 
 mapdeck(
     style = "mapbox://styles/mapbox/dark-v10",
     pitch = 45
 ) |> 
     add_polygon(
-        data = neighborhoods,
+        data = cook_county_homicide_vis_nodes,
         fill_colour = "neighborhood",
         fill_opacity = 175,
         stroke_colour = "#FFFFFFFF",
         stroke_width = 100
-    ) #|> 
+    ) |> 
     add_arc(
-        data = filter(cook_county_homicide_vis_edges),
+        data = cook_county_homicide_vis_edges,
         origin = c("from_lon", "from_lat"),
         destination = c("to_lon", "to_lat"),
         stroke_from = "from_degree",
