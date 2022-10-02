@@ -14,9 +14,10 @@ library(tidyverse)
 ```
 
 ```{r}
+library(targets)
 tar_make()
-tar_load(cook_county_homicide_vis_nodes)
-tar_load(cook_county_homicide_vis_edges)
+tar_load(ccme_archive_generic)
+arrow::write_parquet(tar_read(ccme_archive_generic), "ccme_archive_generic_2022_10_02.parquet")
 ```
 
 ```{r}
