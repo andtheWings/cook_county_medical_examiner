@@ -11,7 +11,7 @@ read_ccme_archive_raw <- function(ccme_archive_raw_file_csv) {
             GENDER = col_factor(levels = c("Male", "Female")),
             RACE = col_factor(levels = c("Black", "White", "Asian", "Other", "Am. Indian")),
             LATINO = col_character(),
-            MANNER = col_character(),
+            MANNER = col_factor(levels = c("NATURAL", "ACCIDENT", "HOMICIDE", "SUICIDE")),
             PRIMARYCAUSE = col_character(),
             PRIMARYCAUSE_LINEA = col_character(),
             PRIMARYCAUSE_LINEB = col_character(),
