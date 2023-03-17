@@ -6,3 +6,24 @@ wrangle_ccme_homicide_zip_code_boundaries <- function(ccme_homicide_nodes_df, es
     
     return(ccme_zips)
 }
+
+wrangle_ccme_homicide_nodes <- function(ccme_homicide_tbl_graph, ccme_homicide_zip_code_boundaries_sf) {
+    
+    df1 <-
+        ccme_homicide_tbl_graph |> 
+        activate(nodes) |> 
+        as_tibble()
+    
+    df2 <-
+        ccme_homicide_zip_code_boundaries_sf |> 
+        st_drop_geometry() |> 
+        select(ZIP_CODE, PO_NAME, STATE)
+    
+    df3 <- left_join(df1, df2, by = c("name" = "ZIP_CODE")) |> 
+        relocate(
+            PO_NAME, STATE
+        )
+    
+    return(df3)
+    
+}

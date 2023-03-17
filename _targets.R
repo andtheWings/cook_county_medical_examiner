@@ -29,7 +29,32 @@ list(
     tar_target(
         ccme_archive_generic,
         wrangle_ccme_archive_generic(ccme_archive_raw)
+    ),
+    
+    
+    # Tiger ZCTA
+    tar_target(
+        name = zctas_of_illinois,
+        command = tigris::zctas(year = 2010, state = "IL")
+    ),
+    
+    # Cook County Boundary
+    tar_target(
+        cook_county_boundary_file,
+        # https://hub-cookcountyil.opendata.arcgis.com/datasets/ea127f9e96b74677892722069c984198_1/explore
+        "data/Cook_County_Border.geojson",
+        format = "file"
+    ),
+    tar_target(
+        cook_county_boundary,
+        st_read(cook_county_boundary_file) |> st_transform(4269)
+    ),
+    
+    tar_target(
+        zctas_of_cook_county,
+        st_intersection(cook_county_boundary, zctas_of_illinois)
     )
+    
     # tar_target(
     #     ccme_homicide_edges,
     #     wrangle_ccme_homicide_edges(ccme_archive_raw)
@@ -53,10 +78,6 @@ list(
     #     # https://hub-cookcountyil.opendata.arcgis.com/datasets/ea127f9e96b74677892722069c984198_1/explore
     #     "data/Cook_County_Border.geojson",
     #     format = "file"
-    # ),
-    # tar_target(
-    #     cook_county_boundary,
-    #     st_read(cook_county_boundary_file)
     # ),
     # # ESRI Zip Code Boundaries
     # tar_target(

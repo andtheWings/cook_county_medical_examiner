@@ -6,3 +6,9 @@ _targets/
 .Rproj.user.backup/
 
 data/
+
+outputs/
+
+test.html
+
+test.Rmd
